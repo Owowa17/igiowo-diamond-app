@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 void main() {
   runApp(const IgiowoApp());
@@ -42,6 +44,9 @@ class MainDashboard extends StatefulWidget {
 class _MainDashboardState extends State<MainDashboard> {
   int _currentIndex = 0;
 
+  // ✅ THE NEW WEB APP URL IS HERE
+  final String scriptUrl = 'https://script.google.com/macros/s/AKfycbx8P5GNDH8nIZ5LglPLDeWpbIoYcqncSWpUOUkz6_lR7riBVyu6kWR3gQJJ7Xb0HcNT/exec';
+
   // Placeholder for the Daily 5 checkboxes
   final List<bool> _dailyTasks = [false, false, false, false, false];
   final List<String> _taskLabels = [
@@ -52,17 +57,61 @@ class _MainDashboardState extends State<MainDashboard> {
     "Listen to 15 mins of personal development",
   ];
 
-  final List<Widget> _pages = [];
+  List<Map<String, dynamic>> _vaultItems = [];
+  bool _isLoadingVault = true;
 
   @override
   void initState() {
     super.initState();
-    _pages.addAll([
-      _buildHomeTab(),
-      _buildTrackerTab(),
-      _buildVaultTab(),
-      _buildCrmTab(),
-    ]);
+    _fetchVaultItems();
+  }
+
+  // Fetch Traffic Vault from Google Sheets
+  Future<void> _fetchVaultItems() async {
+    try {
+      final response = await http.get(Uri.parse('$scriptUrl?action=get_vault'));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['status'] == 'success') {
+          setState(() {
+            _vaultItems = List<Map<String, dynamic>>.from(data['items']);
+            _isLoadingVault = false;
+          });
+        }
+      }
+    } catch (e) {
+      setState(() {
+        _isLoadingVault = false;
+      });
+      print("Error fetching vault: $e");
+    }
+  }
+
+  // Send Daily 5 log to Google Sheets
+  Future<void> _submitDailyLog() async {
+    final Map<String, String> body = {
+      'type': 'daily_log',
+      'contacts': _dailyTasks[0].toString(),
+      'messages': _dailyTasks[1].toString(),
+      'followups': _dailyTasks[2].toString(),
+      'posts': _dailyTasks[3].toString(),
+      'training': _dailyTasks[4].toString(),
+    };
+
+    try {
+      await http.post(Uri.parse(scriptUrl), body: body);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Daily log saved to database! 🚀'), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   @override
@@ -88,7 +137,12 @@ class _MainDashboardState extends State<MainDashboard> {
       ),
       body: IndexedStack(
         index: _currentIndex,
-        children: _pages,
+        children: [
+          _buildHomeTab(),
+          _buildTrackerTab(),
+          _buildVaultTab(),
+          _buildCrmTab(),
+        ],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
@@ -122,7 +176,7 @@ class _MainDashboardState extends State<MainDashboard> {
               children: [
                 const Text("Welcome back, Leader.", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
                 const SizedBox(height: 8),
-                Text("You are on a 7-day streak! Keep pushing.", style: TextStyle(color: Colors.white.withOpacity(0.8))),
+                Text("Consistency creates Diamonds. Keep pushing.", style: TextStyle(color: Colors.white.withOpacity(0.8))),
                 const SizedBox(height: 20),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -188,6 +242,16 @@ class _MainDashboardState extends State<MainDashboard> {
             ),
           );
         }),
+        const SizedBox(height: 20),
+        ElevatedButton(
+          onPressed: _submitDailyLog,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFD4AF37),
+            foregroundColor: Colors.black,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+          ),
+          child: const Text("Save Daily Progress", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        )
       ],
     );
   }
@@ -200,8 +264,12 @@ class _MainDashboardState extends State<MainDashboard> {
         const SizedBox(height: 8),
         const Text("Tap to copy and share on social media.", style: TextStyle(color: Colors.grey)),
         const SizedBox(height: 20),
-        _vaultCard("The Hook", "I'm looking for 3 people who want to fire their boss in 2026. If you want to see how I am building an extra income stream from my phone, comment 'INFO' below!"),
-        _vaultCard("The Story", "3 months ago I was looking for a way out. Today, I am building a business that gives me time freedom. If you are tired of the 9-5, send me a DM."),
+        if (_isLoadingVault)
+          const Center(child: CircularProgressIndicator())
+        else if (_vaultItems.isEmpty)
+          const Text("No messages in the vault yet. Add some to your Google Sheet!")
+        else
+          ..._vaultItems.map((item) => _vaultCard(item['title'], item['text'])),
       ],
     );
   }
@@ -223,7 +291,7 @@ class _MainDashboardState extends State<MainDashboard> {
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: () {
-                  // Copy to clipboard logic will go here
+                  // Copy logic would go here
                 },
                 icon: const Icon(Icons.copy, size: 18),
                 label: const Text("Copy & Share"),
