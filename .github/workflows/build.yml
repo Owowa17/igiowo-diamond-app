@@ -28,11 +28,10 @@ jobs:
       - name: Generate missing platform folders
         run: flutter create --platforms=android .
 
-      # ✅ THIS IS THE CRUCIAL FIX: Use Python to reliably add the permission
+      # ✅ Add Internet Permission to Android Manifest
       - name: Add Internet Permission to Android Manifest
         run: |
           python3 -c "
-          import re
           with open('android/app/src/main/AndroidManifest.xml', 'r') as f:
               content = f.read()
           if '<uses-permission android:name=\"android.permission.INTERNET\" />' not in content:
@@ -44,9 +43,15 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      # ✅ Generate the Custom Igiowo Diamond Logo
+      - name: Generate App Icons
+        run: flutter pub run flutter_launcher_icons
+
+      # ✅ Build the Final APK
       - name: Build APK
         run: flutter build apk --release
 
+      # ✅ Upload the APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
