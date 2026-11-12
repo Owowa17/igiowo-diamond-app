@@ -44,7 +44,7 @@ class MainDashboard extends StatefulWidget {
 class _MainDashboardState extends State<MainDashboard> {
   int _currentIndex = 0;
 
-  // ✅ THE NEW WEB APP URL IS HERE
+  // ✅ YOUR NEW WEB APP URL IS HERE
   final String scriptUrl = 'https://script.google.com/macros/s/AKfycbyr8IXG0OubSPi8y3OiHuMK8PBUjJbGnkBbf5UDh4Z_DWAeC7lINDqGIirKqXhkMMPi/exec';
 
   // Placeholder for the Daily 5 checkboxes
@@ -77,13 +77,20 @@ class _MainDashboardState extends State<MainDashboard> {
             _vaultItems = List<Map<String, dynamic>>.from(data['items']);
             _isLoadingVault = false;
           });
+        } else {
+          // Show error if the script runs but fails
+          setState(() {
+            _isLoadingVault = false;
+            _vaultItems = [{"title": "Script Error", "text": data['error'] ?? 'Unknown error'}];
+          });
         }
       }
     } catch (e) {
+      // Show network error (e.g. no internet or bad URL)
       setState(() {
         _isLoadingVault = false;
+        _vaultItems = [{"title": "Network Error", "text": e.toString()}];
       });
-      print("Error fetching vault: $e");
     }
   }
 
