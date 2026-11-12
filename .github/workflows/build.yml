@@ -28,9 +28,18 @@ jobs:
       - name: Generate missing platform folders
         run: flutter create --platforms=android .
 
+      # ✅ THIS IS THE CRUCIAL FIX: Use Python to reliably add the permission
       - name: Add Internet Permission to Android Manifest
         run: |
-          sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"/>' android/app/src/main/AndroidManifest.xml
+          python3 -c "
+          import re
+          with open('android/app/src/main/AndroidManifest.xml', 'r') as f:
+              content = f.read()
+          if '<uses-permission android:name=\"android.permission.INTERNET\" />' not in content:
+              content = content.replace('<application', '<uses-permission android:name=\"android.permission.INTERNET\" />\n    <application')
+              with open('android/app/src/main/AndroidManifest.xml', 'w') as f:
+                  f.write(content)
+          "
 
       - name: Install dependencies
         run: flutter pub get
