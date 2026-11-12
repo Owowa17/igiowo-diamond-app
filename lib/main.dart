@@ -45,7 +45,7 @@ class _MainDashboardState extends State<MainDashboard> {
   int _currentIndex = 0;
 
   // ✅ YOUR NEW WEB APP URL IS HERE
-  final String scriptUrl = 'https://script.google.com/macros/s/AKfycbxlB9StjS3EbBMuC7Dd1bwzHklpPduUve_siz-QVv_AuwEj6to7Tztafbs8qpysDY3E/exec';
+  final String scriptUrl = 'https://script.google.com/macros/s/AKfycbxFxITNJWUc8yPh9KocF1-f797cMjOZD1uyayIkCoj3oQFpZtPGTEbr4AdGiLYavlDi/exec';
 
   // Placeholder for the Daily 5 checkboxes
   final List<bool> _dailyTasks = [false, false, false, false, false];
