@@ -44,8 +44,8 @@ class MainDashboard extends StatefulWidget {
 class _MainDashboardState extends State<MainDashboard> {
   int _currentIndex = 0;
 
-  // ✅ YOUR WEB APP URL IS FIXED HERE
-  final String scriptUrl = 'https://script.google.com/macros/s/AKfycbx8P5GNDH8nIZ5LglPLDeWpbIoYcqncSWpUOUkz6_lR7riBVyu6kWR3gQJJ7Xb0HcNT/exec';
+  // ✅ CLEAN URL (No /a/*/)
+  final String scriptUrl = 'https://script.google.com/macros/s/AKfycbwLg9hN5JdLlSzXoREAB79js6R1MeibQM3NJ1RIwIhNHiF8WzrFwhCjBtJ8zrJ1BWEi/exec';
 
   // Placeholder for the Daily 5 checkboxes
   final List<bool> _dailyTasks = [false, false, false, false, false];
