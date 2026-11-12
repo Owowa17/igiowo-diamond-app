@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // ✅ REQUIRED FOR CLIPBOARD
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
@@ -298,7 +299,14 @@ class _MainDashboardState extends State<MainDashboard> {
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: () {
-                  // Copy logic would go here
+                  // ✅ THIS COPIES THE MESSAGE TO YOUR CLIPBOARD
+                  Clipboard.setData(ClipboardData(text: text));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Message copied! Go share it on WhatsApp 🚀'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
                 },
                 icon: const Icon(Icons.copy, size: 18),
                 label: const Text("Copy & Share"),
