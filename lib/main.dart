@@ -44,8 +44,8 @@ class MainDashboard extends StatefulWidget {
 class _MainDashboardState extends State<MainDashboard> {
   int _currentIndex = 0;
 
-  // ✅ YOUR NEW WEB APP URL IS HERE
-  final String scriptUrl = 'https://script.google.com/macros/s/AKfycbwwakCtyLxL8-yimYQHovzNJgNJPXQOdrAvFnTwHxWBORbpWWqvfMGO8QeawfFgWssy/exec';
+  // ✅ YOUR WEB APP URL IS FIXED HERE
+  final String scriptUrl = 'https://script.google.com/macros/s/AKfycbx8P5GNDH8nIZ5LglPLDeWpbIoYcqncSWpUOUkz6_lR7riBVyu6kWR3gQJJ7Xb0HcNT/exec';
 
   // Placeholder for the Daily 5 checkboxes
   final List<bool> _dailyTasks = [false, false, false, false, false];
@@ -81,7 +81,7 @@ class _MainDashboardState extends State<MainDashboard> {
           // Show error if the script runs but fails
           setState(() {
             _isLoadingVault = false;
-            _vaultItems = [{"title": "Script Error", "text": data['error'] ?? 'Unknown error'}];
+            _vaultItems = [{"title": "Script Error", "text": data['message'] ?? 'Unknown error'}];
           });
         }
       }
