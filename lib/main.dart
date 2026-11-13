@@ -59,6 +59,8 @@ class _MainDashboardState extends State<MainDashboard> {
 
   List<Map<String, dynamic>> _vaultItems = [];
   List<Map<String, dynamic>> _prospects = [];
+  int _totalCarats = 0;
+  
   bool _isLoadingVault = true;
   bool _isLoadingProspects = true;
 
@@ -67,6 +69,7 @@ class _MainDashboardState extends State<MainDashboard> {
     super.initState();
     _fetchVaultItems();
     _fetchProspects();
+    _fetchCarats(); // ✅ Fetch Carats on load
   }
 
   Future<void> _fetchVaultItems() async {
@@ -103,6 +106,22 @@ class _MainDashboardState extends State<MainDashboard> {
     }
   }
 
+  Future<void> _fetchCarats() async {
+    try {
+      final response = await http.get(Uri.parse('$scriptUrl?action=get_carats'));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['status'] == 'success') {
+          setState(() {
+            _totalCarats = data['carats'] ?? 0;
+          });
+        }
+      }
+    } catch (e) {
+      print("Error fetching carats: $e");
+    }
+  }
+
   Future<void> _submitDailyLog() async {
     final Map<String, String> body = {
       'type': 'daily_log',
@@ -114,11 +133,24 @@ class _MainDashboardState extends State<MainDashboard> {
     };
 
     try {
-      await http.post(Uri.parse(scriptUrl), body: body);
+      final response = await http.post(Uri.parse(scriptUrl), body: body);
+      final data = jsonDecode(response.body);
+      
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Daily log saved to database! 🚀'), backgroundColor: Colors.green),
-        );
+        if (data['status'] == 'success') {
+          int earned = data['earned'] ?? 0;
+          setState(() {
+            _totalCarats = data['total'] ?? _totalCarats;
+          });
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Saved! You earned $earned Carats! 💎🚀'), 
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -165,6 +197,11 @@ class _MainDashboardState extends State<MainDashboard> {
           setState(() {
             _currentIndex = index;
           });
+          // Refresh data when tabs are switched
+          if (index == 0) {
+            _fetchCarats();
+            _fetchProspects();
+          }
         },
         destinations: const [
           NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard), label: 'Home'),
@@ -194,9 +231,9 @@ class _MainDashboardState extends State<MainDashboard> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _statBox("Focus", "Daily 5"),
-                    _statBox("Prospects", "${_prospects.length}"),
-                    _statBox("Rank", "Bronze"),
+                    _statBox("Prospects", "${_prospects.length}", Icons.people),
+                    _statBox("Carats", "$_totalCarats", Icons.diamond), // ✅ CARATS DISPLAY
+                    _statBox("Rank", "Bronze", Icons.military_tech),
                   ],
                 )
               ],
@@ -222,9 +259,11 @@ class _MainDashboardState extends State<MainDashboard> {
     );
   }
 
-  Widget _statBox(String label, String value) {
+  Widget _statBox(String label, String value, IconData icon) {
     return Column(
       children: [
+        Icon(icon, color: const Color(0xFFD4AF37), size: 24),
+        const SizedBox(height: 4),
         Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFFD4AF37))),
         Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
       ],
@@ -237,7 +276,7 @@ class _MainDashboardState extends State<MainDashboard> {
       children: [
         const Text("The Daily 5", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFFD4AF37))),
         const SizedBox(height: 8),
-        const Text("Success is a daily habit. Check off your tasks.", style: TextStyle(color: Colors.grey)),
+        const Text("Success is a daily habit. 10 Carats per task!", style: TextStyle(color: Colors.grey)),
         const SizedBox(height: 20),
         ...List.generate(5, (index) {
           return Card(
@@ -263,7 +302,7 @@ class _MainDashboardState extends State<MainDashboard> {
             foregroundColor: Colors.black,
             padding: const EdgeInsets.symmetric(vertical: 16),
           ),
-          child: const Text("Save Daily Progress", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          child: const Text("Claim Carats & Save", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         )
       ],
     );
@@ -304,7 +343,6 @@ class _MainDashboardState extends State<MainDashboard> {
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: () {
-                  // ✅ COPIES THE TEXT TO THE CLIPBOARD
                   Clipboard.setData(ClipboardData(text: text));
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
