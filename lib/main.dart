@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:flutter/services.dart';
 
 void main() {
   runApp(const IgiowoApp());
@@ -65,7 +66,7 @@ class _MainDashboardState extends State<MainDashboard> {
   void initState() {
     super.initState();
     _fetchVaultItems();
-    _fetchProspects(); // ✅ Fetch prospects on load
+    _fetchProspects();
   }
 
   Future<void> _fetchVaultItems() async {
@@ -87,7 +88,6 @@ class _MainDashboardState extends State<MainDashboard> {
 
   Future<void> _fetchProspects() async {
     try {
-      // ✅ Assuming we add a 'get_prospects' action to your App Script
       final response = await http.get(Uri.parse('$scriptUrl?action=get_prospects'));
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -195,7 +195,7 @@ class _MainDashboardState extends State<MainDashboard> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     _statBox("Focus", "Daily 5"),
-                    _statBox("Prospects", "${_prospects.length}"), // ✅ DYNAMIC COUNT
+                    _statBox("Prospects", "${_prospects.length}"),
                     _statBox("Rank", "Bronze"),
                   ],
                 )
@@ -278,7 +278,7 @@ class _MainDashboardState extends State<MainDashboard> {
         const Text("Tap to copy and share on social media.", style: TextStyle(color: Colors.grey)),
         const SizedBox(height: 20),
         if (_isLoadingVault)
-          const Center(child: CircularProgressIndicator())
+          const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
         else if (_vaultItems.isEmpty)
           const Text("No messages in the vault yet. Add some to your Google Sheet!")
         else
@@ -304,7 +304,15 @@ class _MainDashboardState extends State<MainDashboard> {
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: () {
-                  // Copy logic would go here
+                  // ✅ COPIES THE TEXT TO THE CLIPBOARD
+                  Clipboard.setData(ClipboardData(text: text));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Message copied! Go share it on WhatsApp 🚀'),
+                      backgroundColor: Colors.green,
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
                 },
                 icon: const Icon(Icons.copy, size: 18),
                 label: const Text("Copy & Share"),
