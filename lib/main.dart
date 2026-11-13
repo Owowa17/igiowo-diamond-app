@@ -122,28 +122,24 @@ class _MainDashboardState extends State<MainDashboard> {
     }
   }
 
-  // ✅ FIXED FUNCTION HERE
+  // ✅ FIXED: Sends Daily Log via GET request
   Future<void> _submitDailyLog() async {
-    final Map<String, String> body = {
-      'type': 'daily_log',
-      'contacts': _dailyTasks[0].toString(),
-      'messages': _dailyTasks[1].toString(),
-      'followups': _dailyTasks[2].toString(),
-      'posts': _dailyTasks[3].toString(),
-      'training': _dailyTasks[4].toString(),
-    };
-
     try {
-      final response = await http.post(
-        Uri.parse(scriptUrl), 
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: body
+      final url = Uri.parse(
+          '$scriptUrl?type=daily_log'
+          '&contacts=${_dailyTasks[0]}'
+          '&messages=${_dailyTasks[1]}'
+          '&followups=${_dailyTasks[2]}'
+          '&posts=${_dailyTasks[3]}'
+          '&training=${_dailyTasks[4]}'
       );
-      
+
+      final response = await http.get(url);
+
       if (mounted) {
-        // ✅ Check if Google returned an empty response (redirect bug)
         if (response.body.isNotEmpty) {
           final data = jsonDecode(response.body);
+          
           if (data['status'] == 'success') {
             int earned = data['earned'] ?? 0;
             setState(() {
@@ -162,7 +158,7 @@ class _MainDashboardState extends State<MainDashboard> {
             );
           }
         } else {
-          // ✅ If response is empty, assume success, refresh carats, and clear boxes
+          // Failsafe
           _fetchCarats();
           setState(() {
             for (int i = 0; i < _dailyTasks.length; i++) {
