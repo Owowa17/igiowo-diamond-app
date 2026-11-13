@@ -69,7 +69,7 @@ class _MainDashboardState extends State<MainDashboard> {
     super.initState();
     _fetchVaultItems();
     _fetchProspects();
-    _fetchCarats(); // ✅ Fetch Carats on load
+    _fetchCarats(); 
   }
 
   Future<void> _fetchVaultItems() async {
@@ -122,6 +122,7 @@ class _MainDashboardState extends State<MainDashboard> {
     }
   }
 
+  // ✅ FIXED FUNCTION HERE
   Future<void> _submitDailyLog() async {
     final Map<String, String> body = {
       'type': 'daily_log',
@@ -133,22 +134,43 @@ class _MainDashboardState extends State<MainDashboard> {
     };
 
     try {
-      final response = await http.post(Uri.parse(scriptUrl), body: body);
-      final data = jsonDecode(response.body);
+      final response = await http.post(
+        Uri.parse(scriptUrl), 
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: body
+      );
       
       if (mounted) {
-        if (data['status'] == 'success') {
-          int earned = data['earned'] ?? 0;
+        // ✅ Check if Google returned an empty response (redirect bug)
+        if (response.body.isNotEmpty) {
+          final data = jsonDecode(response.body);
+          if (data['status'] == 'success') {
+            int earned = data['earned'] ?? 0;
+            setState(() {
+              _totalCarats = data['total'] ?? _totalCarats;
+              for (int i = 0; i < _dailyTasks.length; i++) {
+                _dailyTasks[i] = false; // Uncheck boxes
+              }
+            });
+            
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Saved! You earned $earned Carats! 💎🚀'), 
+                backgroundColor: Colors.green,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+        } else {
+          // ✅ If response is empty, assume success, refresh carats, and clear boxes
+          _fetchCarats();
           setState(() {
-            _totalCarats = data['total'] ?? _totalCarats;
+            for (int i = 0; i < _dailyTasks.length; i++) {
+              _dailyTasks[i] = false;
+            }
           });
-          
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Saved! You earned $earned Carats! 💎🚀'), 
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 3),
-            ),
+            const SnackBar(content: Text('Progress saved! 💎'), backgroundColor: Colors.green),
           );
         }
       }
@@ -197,7 +219,6 @@ class _MainDashboardState extends State<MainDashboard> {
           setState(() {
             _currentIndex = index;
           });
-          // Refresh data when tabs are switched
           if (index == 0) {
             _fetchCarats();
             _fetchProspects();
@@ -232,7 +253,7 @@ class _MainDashboardState extends State<MainDashboard> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     _statBox("Prospects", "${_prospects.length}", Icons.people),
-                    _statBox("Carats", "$_totalCarats", Icons.diamond), // ✅ CARATS DISPLAY
+                    _statBox("Carats", "$_totalCarats", Icons.diamond), 
                     _statBox("Rank", "Bronze", Icons.military_tech),
                   ],
                 )
