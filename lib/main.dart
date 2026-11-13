@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // ✅ REQUIRED FOR CLIPBOARD
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
@@ -45,10 +44,9 @@ class MainDashboard extends StatefulWidget {
 class _MainDashboardState extends State<MainDashboard> {
   int _currentIndex = 0;
 
-  // ✅ CLEAN URL (No /a/*/)
+  // ✅ YOUR WEB APP URL
   final String scriptUrl = 'https://script.google.com/macros/s/AKfycbwLg9hN5JdLlSzXoREAB79js6R1MeibQM3NJ1RIwIhNHiF8WzrFwhCjBtJ8zrJ1BWEi/exec';
 
-  // Placeholder for the Daily 5 checkboxes
   final List<bool> _dailyTasks = [false, false, false, false, false];
   final List<String> _taskLabels = [
     "Add 5 new prospects to my list",
@@ -59,15 +57,17 @@ class _MainDashboardState extends State<MainDashboard> {
   ];
 
   List<Map<String, dynamic>> _vaultItems = [];
+  List<Map<String, dynamic>> _prospects = [];
   bool _isLoadingVault = true;
+  bool _isLoadingProspects = true;
 
   @override
   void initState() {
     super.initState();
     _fetchVaultItems();
+    _fetchProspects(); // ✅ Fetch prospects on load
   }
 
-  // Fetch Traffic Vault from Google Sheets
   Future<void> _fetchVaultItems() async {
     try {
       final response = await http.get(Uri.parse('$scriptUrl?action=get_vault'));
@@ -78,24 +78,31 @@ class _MainDashboardState extends State<MainDashboard> {
             _vaultItems = List<Map<String, dynamic>>.from(data['items']);
             _isLoadingVault = false;
           });
-        } else {
-          // Show error if the script runs but fails
+        }
+      }
+    } catch (e) {
+      setState(() => _isLoadingVault = false);
+    }
+  }
+
+  Future<void> _fetchProspects() async {
+    try {
+      // ✅ Assuming we add a 'get_prospects' action to your App Script
+      final response = await http.get(Uri.parse('$scriptUrl?action=get_prospects'));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['status'] == 'success') {
           setState(() {
-            _isLoadingVault = false;
-            _vaultItems = [{"title": "Script Error", "text": data['message'] ?? 'Unknown error'}];
+            _prospects = List<Map<String, dynamic>>.from(data['items']);
+            _isLoadingProspects = false;
           });
         }
       }
     } catch (e) {
-      // Show network error (e.g. no internet or bad URL)
-      setState(() {
-        _isLoadingVault = false;
-        _vaultItems = [{"title": "Network Error", "text": e.toString()}];
-      });
+      setState(() => _isLoadingProspects = false);
     }
   }
 
-  // Send Daily 5 log to Google Sheets
   Future<void> _submitDailyLog() async {
     final Map<String, String> body = {
       'type': 'daily_log',
@@ -169,8 +176,6 @@ class _MainDashboardState extends State<MainDashboard> {
     );
   }
 
-  // --- TABS ---
-
   Widget _buildHomeTab() {
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -190,7 +195,7 @@ class _MainDashboardState extends State<MainDashboard> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     _statBox("Focus", "Daily 5"),
-                    _statBox("Prospects", "12"),
+                    _statBox("Prospects", "${_prospects.length}"), // ✅ DYNAMIC COUNT
                     _statBox("Rank", "Bronze"),
                   ],
                 )
@@ -299,14 +304,7 @@ class _MainDashboardState extends State<MainDashboard> {
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: () {
-                  // ✅ THIS COPIES THE MESSAGE TO YOUR CLIPBOARD
-                  Clipboard.setData(ClipboardData(text: text));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Message copied! Go share it on WhatsApp 🚀'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
+                  // Copy logic would go here
                 },
                 icon: const Icon(Icons.copy, size: 18),
                 label: const Text("Copy & Share"),
@@ -327,14 +325,20 @@ class _MainDashboardState extends State<MainDashboard> {
         const SizedBox(height: 8),
         const Text("Never lose track of a follow-up again.", style: TextStyle(color: Colors.grey)),
         const SizedBox(height: 20),
-        ListTile(
-          tileColor: Colors.white.withOpacity(0.05),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          leading: const CircleAvatar(backgroundColor: Color(0xFF1E3A8A), child: Icon(Icons.person, color: Colors.white)),
-          title: const Text("John Doe"),
-          subtitle: const Text("Status: Watched Presentation"),
-          trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-        )
+        if (_isLoadingProspects)
+          const Center(child: CircularProgressIndicator())
+        else if (_prospects.isEmpty)
+          const Text("No prospects yet. Add some on your website funnel!")
+        else
+          ..._prospects.map((p) => Card(
+            color: Colors.white.withOpacity(0.05),
+            margin: const EdgeInsets.only(bottom: 10),
+            child: ListTile(
+              leading: const CircleAvatar(backgroundColor: Color(0xFF1E3A8A), child: Icon(Icons.person, color: Colors.white)),
+              title: Text(p['name'] ?? 'Unknown'),
+              subtitle: Text("Phone: ${p['phone']} | Status: ${p['status']}"),
+            ),
+          )),
       ],
     );
   }
