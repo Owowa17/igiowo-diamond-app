@@ -122,7 +122,6 @@ class _MainDashboardState extends State<MainDashboard> {
     }
   }
 
-  // ✅ SENDING VIA GET - THE FOOLPROOF METHOD
   Future<void> _submitDailyLog() async {
     try {
       final url = Uri.parse(
@@ -368,6 +367,44 @@ class _MainDashboardState extends State<MainDashboard> {
                 icon: const Icon(Icons.copy, size: 18),
                 label: const Text("Copy & Share"),
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD4AF37), foregroundColor: Colors.black),
+              ),
+            ),
+            const SizedBox(height: 10), // Spacing
+            
+            // ✅ NEW: Send to Video Queue Button
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Sending to Video Queue...'), duration: Duration(seconds: 1)),
+                  );
+                  
+                  try {
+                    final url = Uri.parse('$scriptUrl?type=add_to_video_queue&title=${Uri.encodeComponent(title)}&text=${Uri.encodeComponent(text)}');
+                    final response = await http.get(url);
+                    
+                    if (response.body.isNotEmpty) {
+                      final data = jsonDecode(response.body);
+                      if (data['status'] == 'success') {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Added to Video Queue! 🎬'), backgroundColor: Colors.blue),
+                        );
+                      }
+                    }
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.movie_creation_outlined, size: 18),
+                label: const Text("Send to Video Queue"),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFD4AF37),
+                  side: const BorderSide(color: Color(0xFFD4AF37)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
               ),
             )
           ],
