@@ -19,12 +19,12 @@ class IgiowoApp extends StatelessWidget {
         useMaterial3: true,
         brightness: Brightness.dark,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFD4AF37), // Gold
+          seedColor: const Color(0xFFD4AF37),
           brightness: Brightness.dark,
           primary: const Color(0xFFD4AF37),
-          secondary: const Color(0xFF1E3A8A), // Deep Blue
+          secondary: const Color(0xFF1E3A8A),
         ),
-        scaffoldBackgroundColor: const Color(0xFF0F172A), // Dark Navy
+        scaffoldBackgroundColor: const Color(0xFF0F172A),
         appBarTheme: const AppBarTheme(
           backgroundColor: Color(0xFF0F172A),
           elevation: 0,
@@ -45,7 +45,7 @@ class MainDashboard extends StatefulWidget {
 class _MainDashboardState extends State<MainDashboard> {
   int _currentIndex = 0;
 
-  // ✅ YOUR WEB APP URL
+  // ✅ YOUR NEW WEB APP URL
   final String scriptUrl = 'https://script.google.com/macros/s/AKfycbxTGcSYM4JEWuCfQe0s5tvZHBMh66MSzyZvCTvNA3vPy_UVFM9Nvj_IIWJ755bN25yZ/exec';
 
   final List<bool> _dailyTasks = [false, false, false, false, false];
@@ -122,7 +122,7 @@ class _MainDashboardState extends State<MainDashboard> {
     }
   }
 
-  // ✅ FIXED: Sends Daily Log via GET request
+  // ✅ SENDING VIA GET - THE FOOLPROOF METHOD
   Future<void> _submitDailyLog() async {
     try {
       final url = Uri.parse(
@@ -139,27 +139,23 @@ class _MainDashboardState extends State<MainDashboard> {
       if (mounted) {
         if (response.body.isNotEmpty) {
           final data = jsonDecode(response.body);
-          
           if (data['status'] == 'success') {
             int earned = data['earned'] ?? 0;
             setState(() {
               _totalCarats = data['total'] ?? _totalCarats;
               for (int i = 0; i < _dailyTasks.length; i++) {
-                _dailyTasks[i] = false; // Uncheck boxes
+                _dailyTasks[i] = false; 
               }
             });
-            
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text('Saved! You earned $earned Carats! 💎🚀'), 
                 backgroundColor: Colors.green,
-                duration: const Duration(seconds: 3),
               ),
             );
           }
         } else {
-          // Failsafe
-          _fetchCarats();
+          _fetchCarats(); 
           setState(() {
             for (int i = 0; i < _dailyTasks.length; i++) {
               _dailyTasks[i] = false;
