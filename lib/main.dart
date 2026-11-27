@@ -46,7 +46,7 @@ class _MainDashboardState extends State<MainDashboard> {
   int _currentIndex = 0;
 
   // ✅ YOUR NEW WEB APP URL
-  final String scriptUrl = 'https://script.google.com/macros/s/AKfycbxTGcSYM4JEWuCfQe0s5tvZHBMh66MSzyZvCTvNA3vPy_UVFM9Nvj_IIWJ755bN25yZ/exec';
+  final String scriptUrl = 'https://script.google.com/macros/s/AKfycbwBBr33H1D1XcOYm5zEaNNlpmMGN3Tb_W1ETCJznQ08uyfTIZVdZ4N2u6UWQ5uqRNCV/exec';
 
   final List<bool> _dailyTasks = [false, false, false, false, false];
   final List<String> _taskLabels = [
