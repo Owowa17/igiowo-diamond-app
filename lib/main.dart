@@ -45,8 +45,8 @@ class MainDashboard extends StatefulWidget {
 class _MainDashboardState extends State<MainDashboard> {
   int _currentIndex = 0;
 
-  // ✅ YOUR NEW WEB APP URL
-  final String scriptUrl = 'https://script.google.com/macros/s/AKfycbwBBr33H1D1XcOYm5zEaNNlpmMGN3Tb_W1ETCJznQ08uyfTIZVdZ4N2u6UWQ5uqRNCV/exec';
+  final String scriptUrl =
+      'https://script.google.com/macros/s/AKfycbwBBr33H1D1XcOYm5zEaNNlpmMGN3Tb_W1ETCJznQ08uyfTIZVdZ4N2u6UWQ5uqRNCV/exec';
 
   final List<bool> _dailyTasks = [false, false, false, false, false];
   final List<String> _taskLabels = [
@@ -59,68 +59,102 @@ class _MainDashboardState extends State<MainDashboard> {
 
   List<Map<String, dynamic>> _vaultItems = [];
   List<Map<String, dynamic>> _prospects = [];
+  List<Map<String, dynamic>> _videos = [];
   int _totalCarats = 0;
-  
+
   bool _isLoadingVault = true;
   bool _isLoadingProspects = true;
+  bool _isLoadingVideos = true;
 
   @override
   void initState() {
     super.initState();
     _fetchVaultItems();
     _fetchProspects();
-    _fetchCarats(); 
+    _fetchCarats();
+    _fetchVideos();
   }
+
+  /* ---------- Data loading ---------- */
 
   Future<void> _fetchVaultItems() async {
     try {
       final response = await http.get(Uri.parse('$scriptUrl?action=get_vault'));
+      if (!mounted) return;
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (data['status'] == 'success') {
+        if (data is Map && data['status'] == 'success') {
           setState(() {
             _vaultItems = List<Map<String, dynamic>>.from(data['items']);
             _isLoadingVault = false;
           });
+          return;
         }
       }
-    } catch (e) {
       setState(() => _isLoadingVault = false);
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingVault = false);
     }
   }
 
   Future<void> _fetchProspects() async {
     try {
       final response = await http.get(Uri.parse('$scriptUrl?action=get_prospects'));
+      if (!mounted) return;
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (data['status'] == 'success') {
+        if (data is Map && data['status'] == 'success') {
           setState(() {
             _prospects = List<Map<String, dynamic>>.from(data['items']);
             _isLoadingProspects = false;
           });
+          return;
         }
       }
-    } catch (e) {
       setState(() => _isLoadingProspects = false);
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingProspects = false);
     }
   }
 
   Future<void> _fetchCarats() async {
     try {
       final response = await http.get(Uri.parse('$scriptUrl?action=get_carats'));
+      if (!mounted) return;
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (data['status'] == 'success') {
+        if (data is Map && data['status'] == 'success') {
           setState(() {
-            _totalCarats = data['carats'] ?? 0;
+            _totalCarats = (data['carats'] as num?)?.toInt() ?? 0;
           });
         }
       }
     } catch (e) {
-      print("Error fetching carats: $e");
+      debugPrint("Error fetching carats: $e");
     }
   }
+
+  Future<void> _fetchVideos() async {
+    try {
+      final response = await http.get(Uri.parse('$scriptUrl?action=get_videos'));
+      if (!mounted) return;
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data is Map && data['status'] == 'success') {
+          setState(() {
+            _videos = List<Map<String, dynamic>>.from(data['items']);
+            _isLoadingVideos = false;
+          });
+          return;
+        }
+      }
+      setState(() => _isLoadingVideos = false);
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingVideos = false);
+    }
+  }
+
+  /* ---------- Daily 5 ---------- */
 
   Future<void> _submitDailyLog() async {
     try {
@@ -130,40 +164,45 @@ class _MainDashboardState extends State<MainDashboard> {
           '&messages=${_dailyTasks[1]}'
           '&followups=${_dailyTasks[2]}'
           '&posts=${_dailyTasks[3]}'
-          '&training=${_dailyTasks[4]}'
-      );
+          '&training=${_dailyTasks[4]}');
 
       final response = await http.get(url);
+      if (!mounted) return;
 
-      if (mounted) {
-        if (response.body.isNotEmpty) {
-          final data = jsonDecode(response.body);
-          if (data['status'] == 'success') {
-            int earned = data['earned'] ?? 0;
-            setState(() {
-              _totalCarats = data['total'] ?? _totalCarats;
-              for (int i = 0; i < _dailyTasks.length; i++) {
-                _dailyTasks[i] = false; 
-              }
-            });
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Saved! You earned $earned Carats! 💎🚀'), 
-                backgroundColor: Colors.green,
-              ),
-            );
-          }
-        } else {
-          _fetchCarats(); 
+      if (response.body.isNotEmpty) {
+        final data = jsonDecode(response.body);
+        if (data is Map && data['status'] == 'success') {
+          final int earned = (data['earned'] as num?)?.toInt() ?? 0;
           setState(() {
+            _totalCarats = (data['total'] as num?)?.toInt() ?? _totalCarats;
             for (int i = 0; i < _dailyTasks.length; i++) {
               _dailyTasks[i] = false;
             }
           });
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Progress saved! 💎'), backgroundColor: Colors.green),
+            SnackBar(
+              content: Text(earned == 1
+                  ? 'Saved! You earned 1 Carat! 💎🚀'
+                  : 'Saved! You earned $earned Carats! 💎🚀'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          final msg = (data is Map ? data['message'] : null) ?? 'Could not save.';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $msg'), backgroundColor: Colors.red),
           );
         }
+      } else {
+        _fetchCarats();
+        setState(() {
+          for (int i = 0; i < _dailyTasks.length; i++) {
+            _dailyTasks[i] = false;
+          }
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Progress saved! 💎'), backgroundColor: Colors.green),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -173,6 +212,8 @@ class _MainDashboardState extends State<MainDashboard> {
       }
     }
   }
+
+  /* ---------- Layout ---------- */
 
   @override
   Widget build(BuildContext context) {
@@ -202,6 +243,7 @@ class _MainDashboardState extends State<MainDashboard> {
           _buildTrackerTab(),
           _buildVaultTab(),
           _buildCrmTab(),
+          _buildVideosTab(),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -214,16 +256,22 @@ class _MainDashboardState extends State<MainDashboard> {
             _fetchCarats();
             _fetchProspects();
           }
+          if (index == 4) {
+            _fetchVideos();
+          }
         },
         destinations: const [
           NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard), label: 'Home'),
           NavigationDestination(icon: Icon(Icons.check_circle_outline), selectedIcon: Icon(Icons.check_circle), label: 'Daily 5'),
           NavigationDestination(icon: Icon(Icons.send_outlined), selectedIcon: Icon(Icons.send), label: 'Traffic'),
           NavigationDestination(icon: Icon(Icons.people_outline), selectedIcon: Icon(Icons.people), label: 'CRM'),
+          NavigationDestination(icon: Icon(Icons.movie_outlined), selectedIcon: Icon(Icons.movie), label: 'Videos'),
         ],
       ),
     );
   }
+
+  /* ---------- Home ---------- */
 
   Widget _buildHomeTab() {
     return ListView(
@@ -244,7 +292,7 @@ class _MainDashboardState extends State<MainDashboard> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     _statBox("Prospects", "${_prospects.length}", Icons.people),
-                    _statBox("Carats", "$_totalCarats", Icons.diamond), 
+                    _statBox("Carats", "$_totalCarats", Icons.diamond),
                     _statBox("Rank", "Bronze", Icons.military_tech),
                   ],
                 )
@@ -282,13 +330,15 @@ class _MainDashboardState extends State<MainDashboard> {
     );
   }
 
+  /* ---------- Daily 5 ---------- */
+
   Widget _buildTrackerTab() {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         const Text("The Daily 5", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFFD4AF37))),
         const SizedBox(height: 8),
-        const Text("Success is a daily habit. 10 Carats per task!", style: TextStyle(color: Colors.grey)),
+        const Text("Success is a daily habit. 1 Carat per task!", style: TextStyle(color: Colors.grey)),
         const SizedBox(height: 20),
         ...List.generate(5, (index) {
           return Card(
@@ -320,21 +370,27 @@ class _MainDashboardState extends State<MainDashboard> {
     );
   }
 
+  /* ---------- Traffic Vault ---------- */
+
   Widget _buildVaultTab() {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        const Text("Smart Traffic Vault", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFFD4AF37))),
-        const SizedBox(height: 8),
-        const Text("Tap to copy and share on social media.", style: TextStyle(color: Colors.grey)),
-        const SizedBox(height: 20),
-        if (_isLoadingVault)
-          const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
-        else if (_vaultItems.isEmpty)
-          const Text("No messages in the vault yet. Add some to your Google Sheet!")
-        else
-          ..._vaultItems.map((item) => _vaultCard(item['title'], item['text'])),
-      ],
+    return RefreshIndicator(
+      onRefresh: _fetchVaultItems,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        children: [
+          const Text("Smart Traffic Vault", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFFD4AF37))),
+          const SizedBox(height: 8),
+          const Text("Tap to copy and share on social media.", style: TextStyle(color: Colors.grey)),
+          const SizedBox(height: 20),
+          if (_isLoadingVault)
+            const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
+          else if (_vaultItems.isEmpty)
+            const Text("No messages in the vault yet. Add some to your Google Sheet!")
+          else
+            ..._vaultItems.map((item) => _vaultCard('${item['title'] ?? 'Untitled'}', '${item['text'] ?? ''}')),
+        ],
+      ),
     );
   }
 
@@ -369,9 +425,7 @@ class _MainDashboardState extends State<MainDashboard> {
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD4AF37), foregroundColor: Colors.black),
               ),
             ),
-            const SizedBox(height: 10), // Spacing
-            
-            // ✅ NEW: Send to Video Queue Button
+            const SizedBox(height: 10),
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
@@ -379,23 +433,28 @@ class _MainDashboardState extends State<MainDashboard> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Sending to Video Queue...'), duration: Duration(seconds: 1)),
                   );
-                  
                   try {
-                    final url = Uri.parse('$scriptUrl?type=add_to_video_queue&title=${Uri.encodeComponent(title)}&text=${Uri.encodeComponent(text)}');
+                    final url = Uri.parse(
+                        '$scriptUrl?type=add_to_video_queue&title=${Uri.encodeComponent(title)}&text=${Uri.encodeComponent(text)}');
                     final response = await http.get(url);
-                    
-                    if (response.body.isNotEmpty) {
-                      final data = jsonDecode(response.body);
-                      if (data['status'] == 'success') {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Added to Video Queue! 🎬'), backgroundColor: Colors.blue),
-                        );
-                      }
+                    if (!mounted) return;
+                    final data = jsonDecode(response.body);
+                    if (data is Map && data['status'] == 'success') {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Added to Video Queue! 🎬 Check the Videos tab in a few minutes.'), backgroundColor: Colors.blue),
+                      );
+                    } else {
+                      final msg = (data is Map ? data['message'] : null) ?? 'Could not add.';
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Error: $msg'), backgroundColor: Colors.red),
+                      );
                     }
                   } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-                    );
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                      );
+                    }
                   }
                 },
                 icon: const Icon(Icons.movie_creation_outlined, size: 18),
@@ -413,29 +472,102 @@ class _MainDashboardState extends State<MainDashboard> {
     );
   }
 
+  /* ---------- CRM ---------- */
+
   Widget _buildCrmTab() {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        const Text("My Prospects", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFFD4AF37))),
-        const SizedBox(height: 8),
-        const Text("Never lose track of a follow-up again.", style: TextStyle(color: Colors.grey)),
-        const SizedBox(height: 20),
-        if (_isLoadingProspects)
-          const Center(child: CircularProgressIndicator())
-        else if (_prospects.isEmpty)
-          const Text("No prospects yet. Add some on your website funnel!")
-        else
-          ..._prospects.map((p) => Card(
-            color: Colors.white.withOpacity(0.05),
-            margin: const EdgeInsets.only(bottom: 10),
-            child: ListTile(
-              leading: const CircleAvatar(backgroundColor: Color(0xFF1E3A8A), child: Icon(Icons.person, color: Colors.white)),
-              title: Text(p['name'] ?? 'Unknown'),
-              subtitle: Text("Phone: ${p['phone']} | Status: ${p['status']}"),
+    return RefreshIndicator(
+      onRefresh: _fetchProspects,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        children: [
+          const Text("My Prospects", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFFD4AF37))),
+          const SizedBox(height: 8),
+          const Text("Never lose track of a follow-up again.", style: TextStyle(color: Colors.grey)),
+          const SizedBox(height: 20),
+          if (_isLoadingProspects)
+            const Center(child: CircularProgressIndicator())
+          else if (_prospects.isEmpty)
+            const Text("No prospects yet. Add some on your website funnel!")
+          else
+            ..._prospects.map((p) => Card(
+                  color: Colors.white.withOpacity(0.05),
+                  margin: const EdgeInsets.only(bottom: 10),
+                  child: ListTile(
+                    leading: const CircleAvatar(backgroundColor: Color(0xFF1E3A8A), child: Icon(Icons.person, color: Colors.white)),
+                    title: Text('${p['name'] ?? 'Unknown'}'),
+                    subtitle: Text("Phone: ${p['phone'] ?? ''} | Status: ${p['status'] ?? 'New'}"),
+                  ),
+                )),
+        ],
+      ),
+    );
+  }
+
+  /* ---------- Videos ---------- */
+
+  Widget _buildVideosTab() {
+    return RefreshIndicator(
+      onRefresh: _fetchVideos,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        children: [
+          const Text("My Videos", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFFD4AF37))),
+          const SizedBox(height: 8),
+          const Text("Finished videos. Pull down to refresh.", style: TextStyle(color: Colors.grey)),
+          const SizedBox(height: 20),
+          if (_isLoadingVideos)
+            const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
+          else if (_videos.isEmpty)
+            const Text("No finished videos yet. Send a message to the Video Queue and check back in a few minutes.")
+          else
+            ..._videos.map((v) => _videoCard(
+                  '${v['title'] ?? 'Untitled'}',
+                  '${v['link'] ?? ''}',
+                  '${v['date'] ?? ''}',
+                )),
+        ],
+      ),
+    );
+  }
+
+  Widget _videoCard(String title, String link, String date) {
+    return Card(
+      color: const Color(0xFF1E3A8A),
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFD4AF37), fontSize: 16)),
+            const SizedBox(height: 4),
+            Text(date, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            const SizedBox(height: 10),
+            Text(link, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: link));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Video link copied! Paste it in your browser or WhatsApp 🎬'),
+                      backgroundColor: Colors.green,
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.link, size: 18),
+                label: const Text("Copy Video Link"),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD4AF37), foregroundColor: Colors.black),
+              ),
             ),
-          )),
-      ],
+          ],
+        ),
+      ),
     );
   }
 }
