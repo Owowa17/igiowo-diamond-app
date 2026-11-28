@@ -1,7 +1,10 @@
-import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 
 void main() {
   runApp(const IgiowoApp());
@@ -45,9 +48,8 @@ class MainDashboard extends StatefulWidget {
 class _MainDashboardState extends State<MainDashboard> {
   int _currentIndex = 0;
 
-  // ⚠️ IMPORTANT: PASTE YOUR LATEST DEPLOYED APPS SCRIPT URL HERE
   final String scriptUrl =
-      'https://script.google.com/macros/s/AKfycbzM_P2dj3RCOq8NGrKQPQ7p9X778onz87jwYm8jeV19aucR2gHV3iGwY-BS5pt2K0mF/exec';
+      'https://script.google.com/macros/s/AKfycbwBBr33H1D1XcOYm5zEaNNlpmMGN3Tb_W1ETCJznQ08uyfTIZVdZ4N2u6UWQ5uqRNCV/exec';
 
   final List<bool> _dailyTasks = [false, false, false, false, false];
   final List<String> _taskLabels = [
@@ -76,11 +78,49 @@ class _MainDashboardState extends State<MainDashboard> {
     _fetchVideos();
   }
 
+  /* ---------- Network helper with automatic retries ---------- */
+
+  // Retries when the connection drops. For writes, it retries only handshake
+  // failures (they happen before the request is sent), so Carats are never
+  // counted twice.
+  Future<http.Response> _get(Uri url, {bool isWrite = false}) async {
+    Object? lastError;
+    for (int attempt = 1; attempt <= 3; attempt++) {
+      try {
+        return await http.get(url).timeout(const Duration(seconds: 30));
+      } on HandshakeException catch (e) {
+        lastError = e;
+      } on SocketException catch (e) {
+        if (isWrite) rethrow;
+        lastError = e;
+      } on TimeoutException catch (e) {
+        if (isWrite) rethrow;
+        lastError = e;
+      }
+      await Future.delayed(Duration(seconds: attempt * 2));
+    }
+    throw lastError!;
+  }
+
+  String _friendlyError(Object e) {
+    if (e is HandshakeException || e is SocketException || e is TimeoutException) {
+      return 'Network problem. Check your internet and try again.';
+    }
+    return '$e';
+  }
+
+  void _snack(String message, Color color) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: color),
+    );
+  }
+
   /* ---------- Data loading ---------- */
 
   Future<void> _fetchVaultItems() async {
     try {
-      final response = await http.get(Uri.parse('$scriptUrl?action=get_vault'));
+      final response = await _get(Uri.parse('$scriptUrl?action=get_vault'));
       if (!mounted) return;
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -101,7 +141,7 @@ class _MainDashboardState extends State<MainDashboard> {
 
   Future<void> _fetchProspects() async {
     try {
-      final response = await http.get(Uri.parse('$scriptUrl?action=get_prospects'));
+      final response = await _get(Uri.parse('$scriptUrl?action=get_prospects'));
       if (!mounted) return;
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -122,7 +162,7 @@ class _MainDashboardState extends State<MainDashboard> {
 
   Future<void> _fetchCarats() async {
     try {
-      final response = await http.get(Uri.parse('$scriptUrl?action=get_carats'));
+      final response = await _get(Uri.parse('$scriptUrl?action=get_carats'));
       if (!mounted) return;
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -139,7 +179,7 @@ class _MainDashboardState extends State<MainDashboard> {
 
   Future<void> _fetchVideos() async {
     try {
-      final response = await http.get(Uri.parse('$scriptUrl?action=get_videos'));
+      final response = await _get(Uri.parse('$scriptUrl?action=get_videos'));
       if (!mounted) return;
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -170,7 +210,7 @@ class _MainDashboardState extends State<MainDashboard> {
           '&posts=${_dailyTasks[3]}'
           '&training=${_dailyTasks[4]}');
 
-      final response = await http.get(url);
+      final response = await _get(url, isWrite: true);
       if (!mounted) return;
 
       if (response.body.isNotEmpty) {
@@ -183,27 +223,42 @@ class _MainDashboardState extends State<MainDashboard> {
               _dailyTasks[i] = false;
             }
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(earned == 1
-                  ? 'Saved! You earned 1 Carat! 💎🚀'
-                  : 'Saved! You earned $earned Carats! 💎🚀'),
-              backgroundColor: Colors.green,
-            ),
+          _snack(
+            earned == 1
+                ? 'Saved! You earned 1 Carat! 💎🚀'
+                : 'Saved! You earned $earned Carats! 💎🚀',
+            Colors.green,
           );
         } else {
           final msg = (data is Map ? data['message'] : null) ?? 'Could not save.';
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $msg'), backgroundColor: Colors.red),
-          );
+          _snack('Error: $msg', Colors.red);
         }
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving: $e'), backgroundColor: Colors.red),
-        );
+      _snack('Error saving: ${_friendlyError(e)}', Colors.red);
+    }
+  }
+
+  /* ---------- Video queue ---------- */
+
+  Future<void> _sendToVideoQueue(String title, String text) async {
+    _snack('Sending to Video Queue...', Colors.blueGrey);
+    try {
+      final url = Uri.parse(
+          '$scriptUrl?type=add_to_video_queue'
+          '&title=${Uri.encodeComponent(title)}'
+          '&text=${Uri.encodeComponent(text)}');
+      final response = await _get(url, isWrite: true);
+      if (!mounted) return;
+      final data = jsonDecode(response.body);
+      if (data is Map && data['status'] == 'success') {
+        _snack('Added to Video Queue! 🎬 Check the Videos tab in a few minutes.', Colors.blue);
+      } else {
+        final msg = (data is Map ? data['message'] : null) ?? 'Could not add.';
+        _snack('Error: $msg', Colors.red);
       }
+    } catch (e) {
+      _snack('Error: ${_friendlyError(e)}', Colors.red);
     }
   }
 
@@ -382,7 +437,10 @@ class _MainDashboardState extends State<MainDashboard> {
           else if (_vaultItems.isEmpty)
             const Text("No messages in the vault yet. Add some to your Google Sheet!")
           else
-            ..._vaultItems.map((item) => _vaultCard('${item['Title'] ?? 'Untitled'}', '${item['MessageText'] ?? ''}')),
+            ..._vaultItems.map((item) => _vaultCard(
+                  '${item['Title'] ?? item['title'] ?? 'Untitled'}',
+                  '${item['MessageText'] ?? item['text'] ?? ''}',
+                )),
         ],
       ),
     );
@@ -406,13 +464,7 @@ class _MainDashboardState extends State<MainDashboard> {
               child: ElevatedButton.icon(
                 onPressed: () {
                   Clipboard.setData(ClipboardData(text: text));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Message copied! Go share it on WhatsApp 🚀'),
-                      backgroundColor: Colors.green,
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
+                  _snack('Message copied! Go share it on WhatsApp 🚀', Colors.green);
                 },
                 icon: const Icon(Icons.copy, size: 18),
                 label: const Text("Copy & Share"),
@@ -423,41 +475,7 @@ class _MainDashboardState extends State<MainDashboard> {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: () async {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Sending to Video Queue...'), duration: Duration(seconds: 1)),
-                  );
-                  try {
-                    final response = await http.post(
-                      Uri.parse(scriptUrl),
-                      headers: {'Content-Type': 'application/json'},
-                      body: jsonEncode({
-                        'type': 'add_to_video_queue',
-                        'title': title,
-                        'text': text,
-                      }),
-                    );
-                    
-                    if (!mounted) return;
-                    final data = jsonDecode(response.body);
-                    if (data is Map && data['status'] == 'success') {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Added to Video Queue! 🎬 Check the Videos tab in a few minutes.'), backgroundColor: Colors.blue),
-                      );
-                    } else {
-                      final msg = (data is Map ? data['message'] : null) ?? 'Could not add.';
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Error: $msg'), backgroundColor: Colors.red),
-                      );
-                    }
-                  } catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-                      );
-                    }
-                  }
-                },
+                onPressed: () => _sendToVideoQueue(title, text),
                 icon: const Icon(Icons.movie_creation_outlined, size: 18),
                 label: const Text("Send to Video Queue"),
                 style: OutlinedButton.styleFrom(
@@ -516,7 +534,7 @@ class _MainDashboardState extends State<MainDashboard> {
         children: [
           const Text("My Videos", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFFD4AF37))),
           const SizedBox(height: 8),
-          const Text("Finished Shotstack videos. Pull down to refresh.", style: TextStyle(color: Colors.grey)),
+          const Text("Finished videos. Pull down to refresh.", style: TextStyle(color: Colors.grey)),
           const SizedBox(height: 20),
           if (_isLoadingVideos)
             const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
@@ -533,7 +551,6 @@ class _MainDashboardState extends State<MainDashboard> {
     );
   }
 
-  // ⚠️ FIXED: Completed the missing video card widget
   Widget _videoCard(String title, String link, String date) {
     return Card(
       color: const Color(0xFF1E3A8A),
@@ -546,51 +563,19 @@ class _MainDashboardState extends State<MainDashboard> {
             Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFD4AF37), fontSize: 16)),
             const SizedBox(height: 4),
             Text(date, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            const SizedBox(height: 10),
+            Text(link, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
             const SizedBox(height: 12),
-            if (link.isNotEmpty)
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.link, color: Colors.blueAccent, size: 16),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        link,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 12, color: Colors.blueAccent),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: () {
-                  if (link.isNotEmpty) {
-                    Clipboard.setData(ClipboardData(text: link));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Video link copied to clipboard! 🎬'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  }
+                  Clipboard.setData(ClipboardData(text: link));
+                  _snack('Video link copied! Paste it in your browser or WhatsApp 🎬', Colors.green);
                 },
-                icon: const Icon(Icons.copy, size: 18),
+                icon: const Icon(Icons.link, size: 18),
                 label: const Text("Copy Video Link"),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFD4AF37),
-                  foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD4AF37), foregroundColor: Colors.black),
               ),
             ),
           ],
