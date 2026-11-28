@@ -45,8 +45,9 @@ class MainDashboard extends StatefulWidget {
 class _MainDashboardState extends State<MainDashboard> {
   int _currentIndex = 0;
 
+  // ⚠️ IMPORTANT: PASTE YOUR LATEST DEPLOYED APPS SCRIPT URL HERE
   final String scriptUrl =
-      'https://script.google.com/macros/s/AKfycbwBBr33H1D1XcOYm5zEaNNlpmMGN3Tb_W1ETCJznQ08uyfTIZVdZ4N2u6UWQ5uqRNCV/exec';
+      'https://script.google.com/macros/s/AKfycbzM_P2dj3RCOq8NGrKQPQ7p9X778onz87jwYm8jeV19aucR2gHV3iGwY-BS5pt2K0mF/exec';
 
   final List<bool> _dailyTasks = [false, false, false, false, false];
   final List<String> _taskLabels = [
@@ -93,6 +94,7 @@ class _MainDashboardState extends State<MainDashboard> {
       }
       setState(() => _isLoadingVault = false);
     } catch (e) {
+      debugPrint("Error Vault: $e");
       if (mounted) setState(() => _isLoadingVault = false);
     }
   }
@@ -113,6 +115,7 @@ class _MainDashboardState extends State<MainDashboard> {
       }
       setState(() => _isLoadingProspects = false);
     } catch (e) {
+      debugPrint("Error Prospects: $e");
       if (mounted) setState(() => _isLoadingProspects = false);
     }
   }
@@ -130,7 +133,7 @@ class _MainDashboardState extends State<MainDashboard> {
         }
       }
     } catch (e) {
-      debugPrint("Error fetching carats: $e");
+      debugPrint("Error Carats: $e");
     }
   }
 
@@ -150,6 +153,7 @@ class _MainDashboardState extends State<MainDashboard> {
       }
       setState(() => _isLoadingVideos = false);
     } catch (e) {
+      debugPrint("Error Videos: $e");
       if (mounted) setState(() => _isLoadingVideos = false);
     }
   }
@@ -193,16 +197,6 @@ class _MainDashboardState extends State<MainDashboard> {
             SnackBar(content: Text('Error: $msg'), backgroundColor: Colors.red),
           );
         }
-      } else {
-        _fetchCarats();
-        setState(() {
-          for (int i = 0; i < _dailyTasks.length; i++) {
-            _dailyTasks[i] = false;
-          }
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Progress saved! 💎'), backgroundColor: Colors.green),
-        );
       }
     } catch (e) {
       if (mounted) {
@@ -388,7 +382,7 @@ class _MainDashboardState extends State<MainDashboard> {
           else if (_vaultItems.isEmpty)
             const Text("No messages in the vault yet. Add some to your Google Sheet!")
           else
-            ..._vaultItems.map((item) => _vaultCard('${item['title'] ?? 'Untitled'}', '${item['text'] ?? ''}')),
+            ..._vaultItems.map((item) => _vaultCard('${item['Title'] ?? 'Untitled'}', '${item['MessageText'] ?? ''}')),
         ],
       ),
     );
@@ -434,9 +428,16 @@ class _MainDashboardState extends State<MainDashboard> {
                     const SnackBar(content: Text('Sending to Video Queue...'), duration: Duration(seconds: 1)),
                   );
                   try {
-                    final url = Uri.parse(
-                        '$scriptUrl?type=add_to_video_queue&title=${Uri.encodeComponent(title)}&text=${Uri.encodeComponent(text)}');
-                    final response = await http.get(url);
+                    final response = await http.post(
+                      Uri.parse(scriptUrl),
+                      headers: {'Content-Type': 'application/json'},
+                      body: jsonEncode({
+                        'type': 'add_to_video_queue',
+                        'title': title,
+                        'text': text,
+                      }),
+                    );
+                    
                     if (!mounted) return;
                     final data = jsonDecode(response.body);
                     if (data is Map && data['status'] == 'success') {
@@ -515,7 +516,7 @@ class _MainDashboardState extends State<MainDashboard> {
         children: [
           const Text("My Videos", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFFD4AF37))),
           const SizedBox(height: 8),
-          const Text("Finished videos. Pull down to refresh.", style: TextStyle(color: Colors.grey)),
+          const Text("Finished Shotstack videos. Pull down to refresh.", style: TextStyle(color: Colors.grey)),
           const SizedBox(height: 20),
           if (_isLoadingVideos)
             const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
@@ -532,6 +533,7 @@ class _MainDashboardState extends State<MainDashboard> {
     );
   }
 
+  // ⚠️ FIXED: Completed the missing video card widget
   Widget _videoCard(String title, String link, String date) {
     return Card(
       color: const Color(0xFF1E3A8A),
@@ -544,25 +546,51 @@ class _MainDashboardState extends State<MainDashboard> {
             Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFD4AF37), fontSize: 16)),
             const SizedBox(height: 4),
             Text(date, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-            const SizedBox(height: 10),
-            Text(link, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
             const SizedBox(height: 12),
+            if (link.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.link, color: Colors.blueAccent, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        link,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12, color: Colors.blueAccent),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: () {
-                  Clipboard.setData(ClipboardData(text: link));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Video link copied! Paste it in your browser or WhatsApp 🎬'),
-                      backgroundColor: Colors.green,
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
+                  if (link.isNotEmpty) {
+                    Clipboard.setData(ClipboardData(text: link));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Video link copied to clipboard! 🎬'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
                 },
-                icon: const Icon(Icons.link, size: 18),
+                icon: const Icon(Icons.copy, size: 18),
                 label: const Text("Copy Video Link"),
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD4AF37), foregroundColor: Colors.black),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD4AF37),
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
               ),
             ),
           ],
