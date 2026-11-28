@@ -48,6 +48,7 @@ class MainDashboard extends StatefulWidget {
 class _MainDashboardState extends State<MainDashboard> {
   int _currentIndex = 0;
 
+  // ⚠️ IMPORTANT: Ensure this URL is your latest deployed web app
   final String scriptUrl =
       'https://script.google.com/macros/s/AKfycbwBBr33H1D1XcOYm5zEaNNlpmMGN3Tb_W1ETCJznQ08uyfTIZVdZ4N2u6UWQ5uqRNCV/exec';
 
@@ -80,9 +81,6 @@ class _MainDashboardState extends State<MainDashboard> {
 
   /* ---------- Network helper with automatic retries ---------- */
 
-  // Retries when the connection drops. For writes, it retries only handshake
-  // failures (they happen before the request is sent), so Carats are never
-  // counted twice.
   Future<http.Response> _get(Uri url, {bool isWrite = false}) async {
     Object? lastError;
     for (int attempt = 1; attempt <= 3; attempt++) {
@@ -97,9 +95,13 @@ class _MainDashboardState extends State<MainDashboard> {
         if (isWrite) rethrow;
         lastError = e;
       }
-      await Future.delayed(Duration(seconds: attempt * 2));
+      
+      // Don't delay if this is the last attempt
+      if (attempt < 3) {
+        await Future.delayed(Duration(seconds: attempt * 2));
+      }
     }
-    throw lastError!;
+    throw lastError ?? Exception("Unknown network failure");
   }
 
   String _friendlyError(Object e) {
@@ -250,6 +252,7 @@ class _MainDashboardState extends State<MainDashboard> {
           '&text=${Uri.encodeComponent(text)}');
       final response = await _get(url, isWrite: true);
       if (!mounted) return;
+      
       final data = jsonDecode(response.body);
       if (data is Map && data['status'] == 'success') {
         _snack('Added to Video Queue! 🎬 Check the Videos tab in a few minutes.', Colors.blue);
@@ -534,7 +537,7 @@ class _MainDashboardState extends State<MainDashboard> {
         children: [
           const Text("My Videos", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFFD4AF37))),
           const SizedBox(height: 8),
-          const Text("Finished videos. Pull down to refresh.", style: TextStyle(color: Colors.grey)),
+          const Text("Finished Shotstack videos. Pull down to refresh.", style: TextStyle(color: Colors.grey)),
           const SizedBox(height: 20),
           if (_isLoadingVideos)
             const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
@@ -564,7 +567,7 @@ class _MainDashboardState extends State<MainDashboard> {
             const SizedBox(height: 4),
             Text(date, style: const TextStyle(fontSize: 12, color: Colors.grey)),
             const SizedBox(height: 10),
-            Text(link, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
+            Text(link, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Colors.blueAccent)),
             const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
